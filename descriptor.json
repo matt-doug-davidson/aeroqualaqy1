@@ -1,0 +1,61 @@
+{
+    "name": "flogo-aeroqualaqy1",
+    "type": "flogo:activity",
+    "version": "0.0.1",
+    "title": "Aeroqual AQY1",
+    "description": "Connector for Aeroqual AQY1",
+    "homepage": "https://github.com/matt-doug-davidson/aeroqualaqy1",
+    "settings":[
+      {
+        "name": "host",
+        "type": "string",
+        "required": true,
+        "description": "The host or IP of instrument"
+      },
+      {
+        "name": "port",
+        "type": "string",
+        "required": true,
+        "description": "The TCP port used by the instrument"
+      },
+      {
+        "name": "username",
+        "type": "string",
+        "required": true,
+        "description": "The username used to login to the instrument"
+      },
+      {
+        "name": "password",
+        "type": "string",
+        "required": true,
+        "description": "The password used to login to the instrument"
+      },
+      {
+        "name": "instrument",
+        "type": "string",
+        "required": true,
+        "description": "The instrument being accessed"
+      },
+      {
+        "name": "mappings",
+        "type": "string",
+        "required": true,
+        "description": "The mapping between instrument key and field"
+      },
+      {
+        "name": "entity",
+        "type": "string",
+        "required": true,
+        "description": "The entity for this instrument"
+      }
+    ],
+    "input": [
+    ],
+    "output": [
+      {
+        "name": "espMqttMsg",
+        "type": "object",
+        "description": "The message espMqttMsg object"
+      }
+    ]
+  }
