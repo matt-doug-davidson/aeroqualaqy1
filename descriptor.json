@@ -53,9 +53,9 @@
     ],
     "output": [
       {
-        "name": "espMqttMsg",
+        "name": "connectorMsg",
         "type": "object",
-        "description": "The message espMqttMsg object"
+        "description": "The message for connectorMsg object"
       }
     ]
   }

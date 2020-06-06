@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/matt-doug-davidson/espmqtt"
+	"github.com/matt-doug-davidson/connector"
 	"github.com/project-flogo/core/activity"
 	"github.com/project-flogo/core/data/metadata"
 )
@@ -135,13 +135,13 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 	}
 	//results := string([]byte(body))
 
-	espMqttData := parse(body, mappings)
-	espMqttData.Topic = entity
-	fmt.Println(espMqttData)
-	espMqttMessage := make(map[string]interface{})
-	espMqttMessage["msg"] = espMqttData
+	connectorData := parse(body, mappings)
+	connectorData.Entity = entity
+	fmt.Println(connectorData)
+	ConnectorMessage := make(map[string]interface{})
+	ConnectorMessage["msg"] = connectorData
 
-	err = ctx.SetOutput("espMqttMsg", espMqttMessage)
+	err = ctx.SetOutput("connectorMsg", ConnectorMessage)
 	if err != nil {
 		logger.Error("Failed to set output oject ", err.Error())
 		return false, err
@@ -150,9 +150,9 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 	return true, nil
 }
 
-func parse(body []byte, mappings map[string]string) espmqtt.EspMessage {
+func parse(body []byte, mappings map[string]string) connector.ConnectorMessage {
 
-	var espMessage espmqtt.EspMessage
+	var connectorMessage connector.ConnectorMessage
 	var e interface{}
 	err := json.Unmarshal([]byte(body), &e)
 	if err != nil {
@@ -164,18 +164,18 @@ func parse(body []byte, mappings map[string]string) espmqtt.EspMessage {
 	d2 := d1[0].(map[string]interface{})
 	datetime := d2["Time"].(string)
 	// Convert the date string to espformatted time
-	espMessage.Payload.Datetime = espmqtt.FormatESPTime(datetime)
+	connectorMessage.Snapshot.Datetime = connector.FormatESPTime(datetime)
 
 	// Loop over the data, convert the field names, add the amounts while
-	// adding to the esp message.
+	// adding to the connector message.
 	for k, v := range d2 {
-		espField := mappings[k]
-		if espField == "" {
+		field := mappings[k]
+		if field == "" {
 			continue
 		}
-		value := espmqtt.EspValues{Field: espField, Amount: v.(float64), Attributes: ""}
-		espMessage.Payload.Values = append(espMessage.Payload.Values, value)
+		value := connector.Measurement{Field: field, Amount: v.(float64), Attributes: ""}
+		connectorMessage.Snapshot.Measurements = append(connectorMessage.Snapshot.Measurements, value)
 	}
 
-	return espMessage
+	return connectorMessage
 }
