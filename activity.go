@@ -135,13 +135,16 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 	}
 	//results := string([]byte(body))
 
-	connectorData := parse(body, mappings)
-	connectorData.Entity = entity
-	fmt.Println(connectorData)
-	ConnectorMessage := make(map[string]interface{})
-	ConnectorMessage["msg"] = connectorData
+	output := map[string]interface{}{}
+	message := parse(body, mappings)
+	output["data"] = message
+	output["entity"] = entity
 
-	err = ctx.SetOutput("connectorMsg", ConnectorMessage)
+	fmt.Println(output)
+	// ConnectorMessage := make(map[string]interface{})
+	// ConnectorMessage["msg"] = connectorData
+
+	err = ctx.SetOutput("connectorMsg", output)
 	if err != nil {
 		logger.Error("Failed to set output oject ", err.Error())
 		return false, err
@@ -150,9 +153,8 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 	return true, nil
 }
 
-func parse(body []byte, mappings map[string]string) connector.ConnectorMessage {
+func parse(body []byte, mappings map[string]string) map[string]interface{} {
 
-	var connectorMessage connector.ConnectorMessage
 	var e interface{}
 	err := json.Unmarshal([]byte(body), &e)
 	if err != nil {
@@ -162,20 +164,27 @@ func parse(body []byte, mappings map[string]string) connector.ConnectorMessage {
 	d1 := m1["data"].([]interface{})
 	// The first element of the array contains the latest data
 	d2 := d1[0].(map[string]interface{})
-	datetime := d2["Time"].(string)
+	//datetime := d2["Time"].(string)
 	// Convert the date string to espformatted time
-	connectorMessage.Snapshot.Datetime = connector.FormatESPTime(datetime)
+	datetime := connector.FormatESPTime(d2["Time"].(string))
+
+	values := make([]map[string]interface{}, 0, 10)
+	message := map[string]interface{}{}
 
 	// Loop over the data, convert the field names, add the amounts while
 	// adding to the connector message.
 	for k, v := range d2 {
+		value := map[string]interface{}{}
 		field := mappings[k]
 		if field == "" {
 			continue
 		}
-		value := connector.Measurement{Field: field, Amount: v.(float64), Attributes: ""}
-		connectorMessage.Snapshot.Measurements = append(connectorMessage.Snapshot.Measurements, value)
+		value["field"] = field
+		value["amount"] = v.(float64)
+		values = append(values, value)
 	}
+	message["values"] = values
+	message["datetime"] = datetime
 
-	return connectorMessage
+	return message
 }
