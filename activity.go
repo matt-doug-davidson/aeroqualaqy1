@@ -207,8 +207,12 @@ func parse(body []byte, mappings map[string]map[string]interface{}) map[string]i
 	for k, v := range d2 {
 		fmt.Println("k ", k, "v ", v)
 		value := map[string]interface{}{}
-		field := mappings[k]["field"]
+		//var found bool
+		field, found := mappings[k]["field"]
 		fmt.Println("field ", field)
+		if !found {
+			continue
+		}
 		if field == "" {
 			continue
 		}
