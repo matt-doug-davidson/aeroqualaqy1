@@ -205,8 +205,10 @@ func parse(body []byte, mappings map[string]map[string]interface{}) map[string]i
 	// Loop over the data, convert the field names, add the amounts while
 	// adding to the connector message.
 	for k, v := range d2 {
+		fmt.Println("k ", k, "v ", v)
 		value := map[string]interface{}{}
 		field := mappings[k]["field"]
+		fmt.Println("field ", field)
 		if field == "" {
 			continue
 		}
