@@ -18,7 +18,7 @@ import (
 // Common structure
 type Activity struct {
 	settings *Settings // Defind in metadata.go in this package
-	mapping  map[string]string
+	Mappings map[string]map[string]interface{}
 }
 
 // Metadata returns the activity's metadata
@@ -51,16 +51,47 @@ func New(ctx activity.InitContext) (activity.Activity, error) {
 		logger.Error("Failed to convert settings")
 		return nil, err
 	}
-	mapping := make(map[string]string)
-	maps := strings.Split(s.Mappings, " ")
-	for _, y := range maps {
-		map1 := strings.Split(y, "->")
-		mapping[map1[0]] = map1[1]
+	// mapping := make(map[string]string)
+	// maps := strings.Split(s.Mappings, " ")
+	// for _, y := range maps {
+	// 	map1 := strings.Split(y, "->")
+	// 	mapping[map1[0]] = map1[1]
+	// }
+	// logger.Info(mapping)
+
+	// Declared an empty map interface
+	var result map[string]interface{}
+	json.Unmarshal([]byte(s.Mappings), &result)
+
+	mm := map[string]map[string]interface{}{}
+	for key, mapper := range result {
+		//a.Mappings[i] = make(map[string]interface{})
+		fmt.Println("result[", key, "]=", mapper)
+		fmt.Printf("key (type) %T\n", key)
+		fmt.Printf("mapper (type) %T\n", mapper)
+		mapper1 := mapper.(map[string]interface{})
+		for sensor, sensorInfo := range mapper1 {
+			fmt.Println("mapper1[", sensor, "]=", sensorInfo)
+			fmt.Printf("sensor (type) %T\n", sensor)
+			fmt.Printf("sensorInfo (type) %T\n", sensorInfo)
+			si := sensorInfo.(map[string]interface{})
+			mm[sensor] = make(map[string]interface{})
+			fmt.Println("si ", si)
+			fmt.Println("si[field ", si["field"])
+			se := map[string]interface{}{}
+			f, foundF := si["field"]
+			if !foundF {
+				continue
+			}
+			se["field"] = f
+			mm[sensor] = se
+			//fmt.Println("f ", f, "found ", found)
+		}
 	}
-	logger.Info(mapping)
+
 	// Create the activity with settings as defaut. Set any other field in
 	//the activity here as well
-	act := &Activity{settings: s, mapping: mapping}
+	act := &Activity{settings: s, Mappings: mm}
 
 	logger.Info("aeroqualaqy1:New exit")
 	return act, nil
@@ -77,7 +108,7 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 	username := a.settings.Username
 	password := a.settings.Password
 	instrument := a.settings.Instrument
-	mappings := a.mapping
+	mappings := a.Mappings
 	entity := a.settings.Entity
 
 	fmt.Println(host, port, username, password, instrument, mappings)
@@ -153,7 +184,7 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 	return true, nil
 }
 
-func parse(body []byte, mappings map[string]string) map[string]interface{} {
+func parse(body []byte, mappings map[string]map[string]interface{}) map[string]interface{} {
 
 	var e interface{}
 	err := json.Unmarshal([]byte(body), &e)
@@ -175,7 +206,7 @@ func parse(body []byte, mappings map[string]string) map[string]interface{} {
 	// adding to the connector message.
 	for k, v := range d2 {
 		value := map[string]interface{}{}
-		field := mappings[k]
+		field := mappings[k]["field"]
 		if field == "" {
 			continue
 		}
