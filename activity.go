@@ -2,7 +2,6 @@ package aeroqualaqy1
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -51,33 +50,17 @@ func New(ctx activity.InitContext) (activity.Activity, error) {
 		logger.Error("Failed to convert settings")
 		return nil, err
 	}
-	// mapping := make(map[string]string)
-	// maps := strings.Split(s.Mappings, " ")
-	// for _, y := range maps {
-	// 	map1 := strings.Split(y, "->")
-	// 	mapping[map1[0]] = map1[1]
-	// }
-	// logger.Info(mapping)
 
 	// Declared an empty map interface
 	var result map[string]interface{}
 	json.Unmarshal([]byte(s.Mappings), &result)
 
 	mm := map[string]map[string]interface{}{}
-	for key, mapper := range result {
-		//a.Mappings[i] = make(map[string]interface{})
-		fmt.Println("result[", key, "]=", mapper)
-		fmt.Printf("key (type) %T\n", key)
-		fmt.Printf("mapper (type) %T\n", mapper)
+	for _, mapper := range result {
 		mapper1 := mapper.(map[string]interface{})
 		for sensor, sensorInfo := range mapper1 {
-			fmt.Println("mapper1[", sensor, "]=", sensorInfo)
-			fmt.Printf("sensor (type) %T\n", sensor)
-			fmt.Printf("sensorInfo (type) %T\n", sensorInfo)
 			si := sensorInfo.(map[string]interface{})
 			mm[sensor] = make(map[string]interface{})
-			fmt.Println("si ", si)
-			fmt.Println("si[field ", si["field"])
 			se := map[string]interface{}{}
 			f, foundF := si["field"]
 			if !foundF {
@@ -85,7 +68,6 @@ func New(ctx activity.InitContext) (activity.Activity, error) {
 			}
 			se["field"] = f
 			mm[sensor] = se
-			//fmt.Println("f ", f, "found ", found)
 		}
 	}
 
@@ -101,7 +83,6 @@ func New(ctx activity.InitContext) (activity.Activity, error) {
 func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 	logger := ctx.Logger()
 	logger.Info("aeroqualaqy1:Eval enter")
-	logger.Info("aeroqualaqy1:Test update")
 
 	host := a.settings.Host
 	port := a.settings.Port
@@ -111,8 +92,6 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 	mappings := a.Mappings
 	entity := a.settings.Entity
 
-	fmt.Println(host, port, username, password, instrument, mappings)
-
 	url := "http://" + host + ":" + port + "/api/account/login"
 	pld := "UserName=" + username + "&" + "password=" + password
 	payload := strings.NewReader(pld)
@@ -120,7 +99,7 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 
 	req, err := http.NewRequest("POST", url, payload)
 	if err != nil {
-		fmt.Println("Error:", err.Error())
+		logger.Error("Error:", err.Error())
 		return
 	}
 
@@ -128,7 +107,7 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 
 	res, err := client.Do(req)
 	if err != nil {
-		fmt.Println("Error:", err.Error())
+		logger.Error("Error:", err.Error())
 		return
 	}
 	defer res.Body.Close()
@@ -157,23 +136,18 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 
 	resGet, err := client.Do(reqGet)
 	if err != nil {
-		fmt.Println("Error:", err.Error())
+		logger.Error("Error:", err.Error())
 		return
 	}
 	body, err := ioutil.ReadAll(resGet.Body)
 	if err != nil {
-		fmt.Println("Error:", err.Error())
+		logger.Error("Error:", err.Error())
 	}
-	//results := string([]byte(body))
 
 	output := map[string]interface{}{}
 	message := parse(body, mappings)
 	output["data"] = message
 	output["entity"] = entity
-
-	fmt.Println(output)
-	// ConnectorMessage := make(map[string]interface{})
-	// ConnectorMessage["msg"] = connectorData
 
 	err = ctx.SetOutput("connectorMsg", output)
 	if err != nil {
@@ -195,8 +169,6 @@ func parse(body []byte, mappings map[string]map[string]interface{}) map[string]i
 	d1 := m1["data"].([]interface{})
 	// The first element of the array contains the latest data
 	d2 := d1[0].(map[string]interface{})
-	//datetime := d2["Time"].(string)
-	// Convert the date string to espformatted time
 	datetime := connector.FormatESPTime(d2["Time"].(string))
 
 	values := make([]map[string]interface{}, 0, 10)
@@ -205,11 +177,8 @@ func parse(body []byte, mappings map[string]map[string]interface{}) map[string]i
 	// Loop over the data, convert the field names, add the amounts while
 	// adding to the connector message.
 	for k, v := range d2 {
-		fmt.Println("k ", k, "v ", v)
 		value := map[string]interface{}{}
-		//var found bool
 		field, found := mappings[k]["field"]
-		fmt.Println("field ", field)
 		if !found {
 			continue
 		}
