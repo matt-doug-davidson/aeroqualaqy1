@@ -15,7 +15,7 @@ flogo install github.com/matt-doug-davidson/aeroqualaqy1
 | password | string | True | Password for log-in to the AQY1 instrument |
 | instrument | string | True | Instrument identification.Note: instrument ID can have spaces. |
 | entity | string | True | Entity to which measurements are related. Exported identifier to other subsystems |
-| mappings | string | True | JSON format that contains mapping between instrument key and output field. See example below. |
+| mappings | string | True | JSON format that contains mapping between instrument key and output field. See example below. When entered in  Flogo Web UI don't need quotes. |
 
 mappings example:
 ```json
