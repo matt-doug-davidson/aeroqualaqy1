@@ -2,11 +2,13 @@ package aeroqualaqy1
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/matt-doug-davidson/connector"
 	"github.com/project-flogo/core/activity"
 	"github.com/project-flogo/core/data/metadata"
@@ -18,6 +20,7 @@ import (
 type Activity struct {
 	settings *Settings // Defind in metadata.go in this package
 	Mappings map[string]map[string]interface{}
+	status   string
 }
 
 // Metadata returns the activity's metadata
@@ -73,10 +76,36 @@ func New(ctx activity.InitContext) (activity.Activity, error) {
 
 	// Create the activity with settings as defaut. Set any other field in
 	//the activity here as well
-	act := &Activity{settings: s, Mappings: mm}
+	act := &Activity{settings: s, Mappings: mm, status: "RUNNING"}
 
 	logger.Info("aeroqualaqy1:New exit")
 	return act, nil
+}
+
+func (a *Activity) createErrorStatus(description string) map[string]interface{} {
+	payload := map[string]interface{}{}
+	payload["status"] = "ERROR"
+	payload["datetime"] = time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+	payload["messageId"] = uuid.New().String()
+	payload["description"] = description
+
+	return payload
+}
+
+func (a *Activity) sendErrorMessage(ctx activity.Context, entity string, description string) bool {
+	if a.status == "ERROR" {
+		return false
+	}
+	a.status = "ERROR"
+	output := map[string]interface{}{}
+	output["data"] = a.createErrorStatus(description)
+	output["entity"] = entity
+	err := ctx.SetOutput("connectorMsg", output)
+	if err != nil {
+		ctx.Logger().Error("Failed to set output oject ", err.Error())
+		return false
+	}
+	return true
 }
 
 // Eval evaluates the activity
@@ -84,6 +113,7 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 	logger := ctx.Logger()
 	logger.Info("aeroqualaqy1:Eval enter")
 
+	output := map[string]interface{}{}
 	host := a.settings.Host
 	port := a.settings.Port
 	username := a.settings.Username
@@ -100,21 +130,25 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 	req, err := http.NewRequest("POST", url, payload)
 	if err != nil {
 		logger.Error("Error:", err.Error())
-		return
+		return false, err
 	}
 
 	client := http.Client{Timeout: 5 * time.Second}
 
 	res, err := client.Do(req)
 	if err != nil {
-		logger.Error("Error:", err.Error())
-		return
+		description := fmt.Sprintf("Connection to %s refused", url)
+		rc := a.sendErrorMessage(ctx, entity, description)
+		logger.Info("aeroqualaqy1:Eval exit")
+		return rc, nil
 	}
 	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
-		logger.Warn("Warning: Status code failure. Returned ", res.StatusCode)
-		return
+		description := fmt.Sprintf("Connection to %s returned status code %d", url, res.StatusCode)
+		rc := a.sendErrorMessage(ctx, entity, description)
+		logger.Info("aeroqualaqy1:Eval exit")
+		return rc, nil
 	}
 
 	url = "http://" + host + ":" + port + "/api/data/" + instrument
@@ -136,16 +170,31 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 
 	resGet, err := client.Do(reqGet)
 	if err != nil {
-		logger.Error("Error:", err.Error())
-		return
+		description := fmt.Sprintf("Connection to %s refused", url)
+		rc := a.sendErrorMessage(ctx, entity, description)
+		logger.Info("aeroqualaqy1:Eval exit")
+		return rc, nil
 	}
+
 	body, err := ioutil.ReadAll(resGet.Body)
 	if err != nil {
 		logger.Error("Error:", err.Error())
+		description := fmt.Sprintf("ioutil.ReadAll failed")
+		rc := a.sendErrorMessage(ctx, entity, description)
+		logger.Info("aeroqualaqy1:Eval exit")
+		return rc, nil
 	}
-
-	output := map[string]interface{}{}
+	fmt.Println(string(body))
 	message := parse(body, mappings)
+	if message == nil {
+		logger.Error("Message error. Parse failed.")
+		return false, nil
+	}
+	if a.status == "ERROR" {
+		message["status"] = "RUNNING"
+	}
+	a.status = "RUNNING"
+
 	output["data"] = message
 	output["entity"] = entity
 
@@ -168,6 +217,12 @@ func parse(body []byte, mappings map[string]map[string]interface{}) map[string]i
 	m1 := e.(map[string]interface{})
 	d1 := m1["data"].([]interface{})
 	// The first element of the array contains the latest data
+	if d1 == nil {
+		return nil
+	}
+	if d1[0] == nil {
+		return nil
+	}
 	d2 := d1[0].(map[string]interface{})
 	datetime := connector.FormatESPTime(d2["Time"].(string))
 
